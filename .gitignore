@@ -1,0 +1,33 @@
+# 依赖
+node_modules/
+vendor/
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# Docker
+data/
+postgres_data/
+redis_data/
+
+# 备份文件
+backups/
+*.sql.gz
+*.dump
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.log
