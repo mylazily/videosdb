@@ -1,0 +1,115 @@
+# ===========================================
+# GitHub Actions CI/CD - 部署数据库到 Oracle Cloud ARM (141.148.0.209)
+# PostgreSQL 18 + Redis 7
+# ===========================================
+
+name: Deploy Database
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/**'
+      - 'docker-compose.yml'
+      - 'scripts/**'
+      - 'Makefile'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy Database via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 141.148.0.209
+          username: root
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          script: |
+            echo "=== 开始部署数据库 ==="
+
+            # 创建数据库目录
+            mkdir -p /opt/videosdb
+            cd /opt/videosdb
+
+            # 创建 docker-compose.yml
+            cat > docker-compose.yml << 'COMPOSE_EOF'
+            version: '3.8'
+
+            services:
+              postgres:
+                image: postgres:18-alpine
+                container_name: videosdb-postgres
+                restart: unless-stopped
+                environment:
+                  POSTGRES_USER: videos
+                  POSTGRES_PASSWORD: videos123
+                  POSTGRES_DB: videosdb
+                  POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+                ports:
+                  - "127.0.0.1:5432:5432"
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                  - ./migrations:/docker-entrypoint-initdb.d:ro
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U videos -d videosdb"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+                  start_period: 30s
+                command: >
+                  postgres
+                    -c shared_preload_libraries='pg_trgm'
+                    -c max_connections=200
+                    -c shared_buffers=256MB
+                    -c effective_cache_size=1GB
+                    -c maintenance_work_mem=256MB
+                    -c checkpoint_completion_target=0.9
+                    -c wal_buffers=16MB
+                    -c default_statistics_target=100
+                    -c random_page_cost=1.1
+                    -c effective_io_concurrency=200
+                    -c work_mem=4MB
+                    -c min_wal_size=1GB
+                    -c max_wal_size=4GB
+                    -c log_min_duration_statement=100
+
+              redis:
+                image: redis:7-alpine
+                container_name: videosdb-redis
+                restart: unless-stopped
+                ports:
+                  - "127.0.0.1:6379:6379"
+                volumes:
+                  - redis_data:/data
+                command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+                healthcheck:
+                  test: ["CMD", "redis-cli", "ping"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+
+            volumes:
+              postgres_data:
+              redis_data:
+            COMPOSE_EOF
+
+            # 拉取并启动
+            docker compose pull
+            docker compose up -d --force-recreate
+            docker image prune -f
+
+            echo "=== 数据库部署完成 ==="
+
+      - name: Sync migration files via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: 141.148.0.209
+          username: root
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          source: "migrations/*"
+          target: "/opt/videosdb/"
+          strip_components: 0
