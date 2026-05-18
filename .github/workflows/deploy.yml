@@ -5,19 +5,18 @@ on:
     branches: [main, master]
     paths:
       - 'migrations/**'
-      - 'docker-compose.yml'
       - 'scripts/**'
       - '.github/workflows/**'
   pull_request:
     branches: [main, master]
     paths:
       - 'migrations/**'
-      - 'docker-compose.yml'
       - 'scripts/**'
   schedule:
     - cron: '0 2 * * *'  # 每天凌晨2点自动备份
 
 env:
+  PG_VERSION: '18'
   DEPLOY_HOST: 141.148.0.209
   DEPLOY_USER: root
   DEPLOY_PATH: /opt/videosdb
@@ -46,14 +45,10 @@ jobs:
             fi
           done
 
-      - name: Validate docker-compose
-        run: |
-          docker compose config > /dev/null
-
   test-migrations:
     runs-on: ubuntu-latest
     needs: validate
-
+    
     services:
       postgres:
         image: postgres:16-alpine
@@ -84,6 +79,9 @@ jobs:
         env:
           PGPASSWORD: test
         run: |
+          # 创建扩展
+          psql -h localhost -U test -d testdb -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+          
           # 按顺序执行迁移文件测试
           for file in migrations/*.sql; do
             echo "Testing migration: $file"
@@ -123,7 +121,6 @@ jobs:
           # 同步迁移文件
           rsync -avz -e "ssh -i ~/.ssh/deploy_key" migrations/ deploy-server:${{ env.DEPLOY_PATH }}/migrations/
           rsync -avz -e "ssh -i ~/.ssh/deploy_key" scripts/ deploy-server:${{ env.DEPLOY_PATH }}/scripts/
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" docker-compose.yml deploy-server:${{ env.DEPLOY_PATH }}/
           rsync -avz -e "ssh -i ~/.ssh/deploy_key" Makefile deploy-server:${{ env.DEPLOY_PATH }}/
 
       - name: Apply migrations
@@ -132,18 +129,29 @@ jobs:
             set -e
             cd /opt/videosdb
             
-            # 确保数据库容器正在运行
-            if ! docker compose ps | grep -q "postgres"; then
-              echo "Starting database containers..."
-              docker compose up -d
-              sleep 10
+            # 检查 PostgreSQL 是否运行
+            if ! systemctl is-active --quiet postgresql@18-main; then
+              echo "⚠️  PostgreSQL 18 未运行，尝试启动..."
+              systemctl start postgresql@18-main || {
+                echo "❌ PostgreSQL 启动失败，请检查安装"
+                exit 1
+              }
+              sleep 5
+            fi
+            
+            # 检查 Redis 是否运行
+            if ! systemctl is-active --quiet redis-server; then
+              echo "⚠️  Redis 未运行，尝试启动..."
+              systemctl start redis-server || true
             fi
             
             # 执行迁移
+            echo "==> 执行数据库迁移..."
             make migrate || exit 1
             
             # 验证迁移状态
-            make status
+            echo "==> 迁移状态:"
+            make migration-status
             
             echo "✅ Database migration completed successfully"
           REMOTESCRIPT
@@ -153,6 +161,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key deploy-server << 'REMOTESCRIPT'
             cd /opt/videosdb
+            echo "==> 重大变更前自动备份..."
             make backup
           REMOTESCRIPT
 
@@ -177,10 +186,45 @@ jobs:
       - name: Run scheduled backup
         run: |
           ssh -i ~/.ssh/deploy_key deploy-server << 'REMOTESCRIPT'
+            set -e
             cd /opt/videosdb
+            
+            echo "==> 执行定时备份..."
             make backup
             
             # 清理7天前的备份
-            find backups -name "*.sql.gz" -mtime +7 -delete
+            echo "==> 清理旧备份..."
+            find backups -name "*.sql.gz" -mtime +7 -delete 2>/dev/null || true
+            
             echo "✅ Scheduled backup completed"
+          REMOTESCRIPT
+
+  health-check:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >> ~/.ssh/config << EOF
+          Host deploy-server
+            HostName ${{ env.DEPLOY_HOST }}
+            User ${{ env.DEPLOY_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+          EOF
+
+      - name: Run health check
+        run: |
+          ssh -i ~/.ssh/deploy_key deploy-server << 'REMOTESCRIPT'
+            cd /opt/videosdb
+            echo "==> 运行数据库健康检查..."
+            make health || echo "健康检查部分失败"
+            
+            echo "==> 数据库状态:"
+            make migration-status
           REMOTESCRIPT

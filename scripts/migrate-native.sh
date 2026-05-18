@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# migrate.sh — 数据库迁移执行脚本
-# 用途：按序号执行未应用的迁移文件
+# migrate-native.sh — 数据库迁移执行脚本（非 Docker 版本）
 # ============================================================
 
 set -euo pipefail
@@ -16,19 +15,38 @@ fi
 
 # 默认值
 POSTGRES_USER="${POSTGRES_USER:-videos}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-videos123}"
 POSTGRES_DB="${POSTGRES_DB:-videosdb}"
-PG_CONTAINER="${PG_CONTAINER:-videosdb-postgres}"
+POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
+POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
 MIGRATIONS_DIR="$PROJECT_DIR/migrations"
 
 # psql 命令
-PSQL_CMD="docker exec -i $PG_CONTAINER psql -U $POSTGRES_USER -d $POSTGRES_DB -v ON_ERROR_STOP=1"
+export PGPASSWORD="$POSTGRES_PASSWORD"
+PSQL_CMD="psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -v ON_ERROR_STOP=1"
 
 # 确保迁移目录存在
 if [ ! -d "$MIGRATIONS_DIR" ]; then
     echo "错误: 迁移目录不存在: $MIGRATIONS_DIR"
     exit 1
 fi
+
+# 等待 PostgreSQL 就绪
+echo "==> 等待 PostgreSQL 就绪..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+
+until pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" > /dev/null 2>&1; do
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        echo "错误: PostgreSQL 在 ${MAX_RETRIES} 秒后仍未就绪"
+        exit 1
+    fi
+    sleep 1
+done
+
+echo "==> PostgreSQL 已就绪"
 
 # 确保迁移记录表存在
 echo "==> 检查迁移记录表..."
