@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS danmaku_realtime (
     user_id         UUID,                                   -- 用户 ID（可选）
     fingerprint_id  UUID,                                   -- 设备指纹 ID（可选）
     content         TEXT NOT NULL,                          -- 弹幕内容
-    time_pos        DECIMAL(6,2) NOT NULL DEFAULT 0,        -- 弹幕时间位置（秒）
+    time_pos        DECIMAL(8,3) NOT NULL DEFAULT 0,        -- 弹幕时间位置（秒，精确到毫秒）
     danmaku_type    SMALLINT NOT NULL DEFAULT 1,            -- 1滚动 2顶部 3底部
     color           VARCHAR(7) DEFAULT '#FFFFFF',           -- 弹幕颜色（HEX）
     is_premium      BOOLEAN DEFAULT FALSE,                  -- VIP 弹幕（特殊样式）

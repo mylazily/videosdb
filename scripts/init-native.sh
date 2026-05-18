@@ -55,7 +55,6 @@ fi
 echo "==> 创建扩展..."
 export PGPASSWORD="$POSTGRES_PASSWORD"
 psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;" 2>/dev/null || true
-psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS uuid-ossp;" 2>/dev/null || true
 
 # 执行所有迁移
 echo "==> 执行数据库迁移..."

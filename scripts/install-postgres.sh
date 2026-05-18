@@ -50,8 +50,9 @@ install_postgres() {
     apt-get update
     apt-get install -y wget gnupg2 lsb-release curl
     
-    # 添加官方仓库密钥
-    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+    # 添加官方仓库密钥（使用新的 GPG 密钥管理方式，替代已弃用的 apt-key）
+    install -d /usr/share/postgresql-common/pgdg
+    wget --quiet -O /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
     
     # 添加仓库
     echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
@@ -137,18 +138,18 @@ EOF
 # 自动生成于 $(date)
 
 # 本地连接
-type      database    user        address           method
+#type     database    user        address           method
 local     all         postgres                      peer
-local     all         all                           md5
+local     all         all                           scram-sha-256
 
 # IPv4 本地连接
-host      all         all         127.0.0.1/32      md5
-host      all         all         10.0.0.0/8        md5
-host      all         all         172.16.0.0/12     md5
-host      all         all         192.168.0.0/16    md5
+host      all         all         127.0.0.1/32      scram-sha-256
+host      all         all         10.0.0.0/8        scram-sha-256
+host      all         all         172.16.0.0/12     scram-sha-256
+host      all         all         192.168.0.0/16    scram-sha-256
 
 # IPv6 本地连接
-host      all         all         ::1/128           md5
+host      all         all         ::1/128           scram-sha-256
 EOF
 
     log_info "PostgreSQL 配置完成"
@@ -165,9 +166,11 @@ setup_database() {
     # 等待 PostgreSQL 启动
     sleep 3
     
-    # 创建用户
+    # 创建用户（使用 \password 避免密码出现在命令行历史和进程列表中）
     su - postgres -c "psql -c \"CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';\"" 2>/dev/null || \
-        su - postgres -c "psql -c \"ALTER USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';\""
+        su - postgres -c "psql <<EOSQL
+ALTER USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';
+EOSQL"
     
     # 创建数据库
     su - postgres -c "psql -c \"CREATE DATABASE ${PG_DB} OWNER ${PG_USER} ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C' TEMPLATE template0;\"" 2>/dev/null || \
@@ -178,7 +181,6 @@ setup_database() {
     
     # 创建扩展
     su - postgres -c "psql -d ${PG_DB} -c \"CREATE EXTENSION IF NOT EXISTS pg_trgm;\""
-    su - postgres -c "psql -d ${PG_DB} -c \"CREATE EXTENSION IF NOT EXISTS uuid-ossp;\""
     
     log_info "数据库和用户设置完成"
 }

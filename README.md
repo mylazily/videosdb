@@ -1,6 +1,6 @@
 # videosdb
 
-> xvideos 影视聚合系统 — PostgreSQL 18 数据库仓库
+> xvideos 影视聚合系统 -- PostgreSQL 18 数据库仓库
 
 ## 项目简介
 
@@ -12,35 +12,38 @@
 |------|------|------|
 | PostgreSQL | 18 | 主数据库，使用 JSONB、tsvector、UUID 等高级特性 |
 | Redis | 7 | 缓存层，用于热搜排行、会话管理等 |
-| Docker | - | 容器化开发环境 |
 | Make | - | 常用数据库操作命令封装 |
 
 ## 核心特性
 
-- **UUID 主键** — 所有核心表使用 UUID v4 作为主键，分布式友好
-- **JSONB 播放线路** — 使用 JSONB 存储聚合多线路播放源，灵活扩展
-- **全文检索** — tsvector + GIN 索引，支持中文分词搜索
-- **软删除** — 所有核心表支持 `deleted_at` 软删除
-- **自动时间戳** — `created_at` / `updated_at` 自动维护
-- **MacCMS 采集** — 内置采集源管理与采集日志系统
-- **社交功能** — 评论嵌套回复、弹幕、点赞、观看历史
-- **排行榜** — 热播榜、评分榜、最新榜
+- **UUID 主键** -- 所有核心表使用 UUID v4 作为主键，分布式友好
+- **JSONB 播放线路** -- 使用 JSONB 存储聚合多线路播放源，灵活扩展
+- **全文检索** -- tsvector + GIN 索引，支持中文分词搜索
+- **软删除** -- 所有核心表支持 `deleted_at` 软删除
+- **自动时间戳** -- `created_at` / `updated_at` 自动维护
+- **MacCMS 采集** -- 内置采集源管理与采集日志系统
+- **社交功能** -- 评论嵌套回复、弹幕、点赞、观看历史
+- **排行榜** -- 热播榜、评分榜、最新榜
 
 ## 快速开始
 
 ### 环境要求
 
-- Docker & Docker Compose
+- PostgreSQL 18
+- Redis 7
 - Make
 
-### 启动开发环境
+### 安装与初始化
 
 ```bash
 # 克隆项目
 git clone <repo-url> && cd videosdb
 
-# 启动 PostgreSQL + Redis
-make up
+# 安装 PostgreSQL 18 和 Redis
+make install
+
+# 启动服务
+make start
 
 # 初始化数据库（创建扩展 + 执行迁移）
 make init
@@ -52,18 +55,20 @@ make seed
 ### 常用命令
 
 ```bash
-# 容器管理
-make up          # 启动 PostgreSQL + Redis 开发环境
-make down        # 停止并移除容器
-make restart     # 重启容器
-make logs        # 查看容器日志
+# 安装与启动
+make install     # 安装 PostgreSQL 18 和 Redis
+make start       # 启动 PostgreSQL 和 Redis 服务
+make stop        # 停止 PostgreSQL 和 Redis 服务
+make restart     # 重启 PostgreSQL 和 Redis 服务
+make status      # 查看服务状态
+make logs        # 查看 PostgreSQL 日志
 
 # 数据库操作
 make init        # 初始化数据库（创建扩展 + 执行所有迁移）
 make migrate     # 执行未应用的迁移
 make rollback N=1 # 回滚最近 N 个迁移
 make seed        # 导入种子数据
-make status      # 查看迁移状态
+make migration-status  # 查看迁移状态
 
 # 备份与恢复
 make backup      # 备份数据库到 backups/ 目录
@@ -106,7 +111,9 @@ videosdb/
 ├── .gitignore                   # Git 忽略规则
 ├── .editorconfig                # 编辑器配置
 ├── Makefile                     # 常用数据库操作命令
-├── docker-compose.yml           # PostgreSQL 18 + Redis 开发环境
+├── .github/
+│   └── workflows/
+│       └── deploy.yml           # CI/CD 配置
 ├── migrations/                  # 数据库迁移文件（按序号执行）
 │   ├── 001_init_schema.sql      # 核心表结构（视频、剧集、播放源）
 │   ├── 002_users_auth.sql       # 用户认证系统
@@ -114,11 +121,31 @@ videosdb/
 │   ├── 004_collect_system.sql   # MacCMS 采集源管理
 │   ├── 005_search_optimization.sql # 全文检索 + 索引优化 + 实用函数
 │   ├── 006_seed_data.sql        # 初始种子数据
-│   └── 007_performance_optimization.sql # 性能优化（分区表、并行查询）
+│   ├── 007_performance_optimization.sql # 性能优化（分区表、并行查询）
+│   ├── 008_tag_system.sql       # 标签系统
+│   ├── 009_short_video.sql      # 短视频支持
+│   ├── 010_fingerprint_auth.sql # 设备指纹认证
+│   ├── 011_seo_system.sql       # SEO 优化
+│   ├── 012_recommendation.sql   # 推荐系统
+│   ├── 013_share_viral.sql      # 分享裂变
+│   ├── 014_site_cluster.sql     # 站群管理
+│   ├── 015_push_notification.sql # 推送通知
+│   ├── 016_p2p_signaling.sql    # P2P 信令
+│   ├── 017_redirect_rules.sql   # 重定向规则引擎
+│   ├── 018_sitemap_auto_submit.sql # Sitemap 自动提交
+│   ├── 019_tg_integration.sql   # Telegram 集成
+│   ├── 020_x_social.sql         # X(Twitter) 社交集成
+│   ├── 021_payment.sql          # 支付系统
+│   ├── 022_ad_reward.sql        # 广告金币系统
+│   ├── 023_realtime_danmaku.sql # 实时弹幕
+│   ├── 024_domain_rotation.sql  # 域名轮询
+│   ├── 025_trigger_fixes.sql    # 触发器修复
+│   └── 026_cleanup_redundant_indexes.sql # 清理冗余索引 + 补充约束
 ├── scripts/                     # 运维脚本
-│   ├── init.sh                  # 初始化脚本
-│   ├── migrate.sh               # 迁移执行脚本
-│   ├── backup.sh                # 备份脚本
+│   ├── install-postgres.sh      # PostgreSQL 安装脚本
+│   ├── init-native.sh           # 数据库初始化脚本
+│   ├── migrate-native.sh        # 迁移执行脚本
+│   ├── backup-native.sh         # 备份脚本
 │   └── health_check.sql         # 数据库健康检查脚本
 └── docs/
     └── schema.md                # 数据库设计文档
@@ -129,18 +156,18 @@ videosdb/
 ### ER 关系
 
 ```
-videos 1──N video_sources        (视频 → 播放源)
-videos 1──N episodes             (视频 → 剧集)
-episodes 1──N episode_sources    (剧集 → 剧集播放源)
-users 1──N comments              (用户 → 评论)
-comments 1──N comments           (评论 → 子评论/回复)
-users N──N comment_likes         (用户 ↔ 评论点赞)
-users 1──N danmakus              (用户 → 弹幕)
-videos 1──N danmakus             (视频 → 弹幕)
-videos 1──N ranks                (视频 → 排行榜)
-users 1──N user_watch_histories  (用户 → 观看历史)
-videos 1──N user_watch_histories (视频 → 观看历史)
-collect_sources 1──N collect_logs (采集源 → 采集日志)
+videos 1──N video_sources        (视频 -> 播放源)
+videos 1──N episodes             (视频 -> 剧集)
+episodes 1──N episode_sources    (剧集 -> 剧集播放源)
+users 1──N comments              (用户 -> 评论)
+comments 1──N comments           (评论 -> 子评论/回复)
+users N──N comment_likes         (用户 <-> 评论点赞)
+users 1──N danmakus              (用户 -> 弹幕)
+videos 1──N danmakus             (视频 -> 弹幕)
+videos 1──N ranks                (视频 -> 排行榜)
+users 1──N user_watch_histories  (用户 -> 观看历史)
+videos 1──N user_watch_histories (视频 -> 观看历史)
+collect_sources 1──N collect_logs (采集源 -> 采集日志)
 ```
 
 ### 核心表一览
@@ -173,6 +200,7 @@ collect_sources 1──N collect_logs (采集源 → 采集日志)
 - **GIN 索引**：用于全文检索（`search_vector`）和 JSONB 查询（`play_links`）
 - **部分索引**：仅索引有效数据，减少索引大小（如 `status = 'published'`）
 - **复合索引**：优化多条件查询（如 `category + status + updated_at`）
+- **覆盖索引**：支持 Index Only Scan，减少回表（如 `idx_videos_cover_basic`）
 
 ### 2. 查询优化
 
@@ -193,7 +221,7 @@ SELECT * FROM v_video_stats WHERE category = '电影';
 
 ```sql
 -- 按时间范围分区示例（在 007_performance_optimization.sql 中实现）
-CREATE TABLE danmakus_2024 PARTITION OF danmakus
+CREATE TABLE danmakus_2024 PARTITION OF danmakus_partitioned
     FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
 ```
 
@@ -256,10 +284,10 @@ ORDER BY pg_relation_size(indexrelid) DESC;
 ### 查询性能监控
 
 ```sql
--- 查看慢查询
-SELECT query, calls, total_time, mean_time, rows
+-- 查看慢查询（需要启用 pg_stat_statements 扩展）
+SELECT query, calls, total_exec_time, mean_exec_time, rows
 FROM pg_stat_statements
-ORDER BY mean_time DESC
+ORDER BY mean_exec_time DESC
 LIMIT 10;
 
 -- 查看表扫描情况
@@ -290,7 +318,7 @@ make backup
 
 ```bash
 # 完整备份（包含数据 + 结构）
-docker exec -i videosdb-postgres pg_dump -U videos -d videosdb > backup.sql
+pg_dump -U videos -d videosdb > backup.sql
 
 # 仅备份结构
 pg_dump -U videos -d videosdb --schema-only > schema.sql
@@ -299,7 +327,7 @@ pg_dump -U videos -d videosdb --schema-only > schema.sql
 pg_dump -U videos -d videosdb --data-only > data.sql
 
 # 压缩备份
-docker exec -i videosdb-postgres pg_dump -U videos -d videosdb | gzip > backup.sql.gz
+pg_dump -U videos -d videosdb | gzip > backup.sql.gz
 ```
 
 ### 恢复数据
@@ -309,10 +337,10 @@ docker exec -i videosdb-postgres pg_dump -U videos -d videosdb | gzip > backup.s
 make restore FILE=backups/videosdb_20240115_120000.sql.gz
 
 # 手动恢复（未压缩）
-docker exec -i videosdb-postgres psql -U videos -d videosdb < backup.sql
+psql -U videos -d videosdb < backup.sql
 
 # 手动恢复（压缩）
-gunzip -c backup.sql.gz | docker exec -i videosdb-postgres psql -U videos -d videosdb
+gunzip -c backup.sql.gz | psql -U videos -d videosdb
 ```
 
 ### 定时备份（Cron）
@@ -366,7 +394,7 @@ SELECT update_video_score('b0000000-0000-0000-0000-000000000001');
 -- 批量更新所有视频统计
 SELECT batch_update_video_scores();
 
--- 清理软删除数据
+-- 清理软删除数据（仅限白名单表）
 SELECT cleanup_soft_deleted('videos', 30);
 ```
 

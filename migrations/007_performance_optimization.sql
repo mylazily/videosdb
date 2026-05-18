@@ -209,20 +209,18 @@ $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION refresh_daily_stats() IS '刷新日统计物化视图';
 
 -- -----------------------------------------------------------
--- 并行查询配置（会话级）
+-- 并行查询配置
 -- -----------------------------------------------------------
 
--- 设置并行查询参数
--- 注意：这些设置可以根据硬件配置调整
-
--- 启用并行查询
-SET max_parallel_workers_per_gather = 4;
-
--- 设置并行工作进程数
-SET max_parallel_workers = 8;
-
--- 设置并行维护工作进程数
-SET max_parallel_maintenance_workers = 4;
+-- 注意：SET 命令仅在当前会话中生效，在迁移脚本中不会持久化。
+-- 如需持久化并行查询参数，请使用以下方式之一：
+--   1. 在 postgresql.conf 中设置
+--   2. 使用 ALTER SYSTEM SET 并执行 SELECT pg_reload_conf();
+-- 示例：
+--   ALTER SYSTEM SET max_parallel_workers_per_gather = 4;
+--   ALTER SYSTEM SET max_parallel_workers = 8;
+--   ALTER SYSTEM SET max_parallel_maintenance_workers = 4;
+--   SELECT pg_reload_conf();
 
 -- -----------------------------------------------------------
 -- 表级并行查询配置
@@ -326,6 +324,9 @@ ORDER BY idx_scan DESC;
 COMMENT ON VIEW v_index_usage_stats IS '索引使用统计视图';
 
 -- 慢查询统计视图（需要启用 pg_stat_statements）
+-- 确保扩展已创建
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
 CREATE OR REPLACE VIEW v_slow_queries AS
 SELECT
     query,

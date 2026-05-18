@@ -112,7 +112,7 @@ lint: ## 检查 SQL 语法
 	@echo "==> 检查 SQL 语法..."
 	@for file in migrations/*.sql; do \
 		echo "检查: $$file"; \
-		$(PSQL) -f $$file --dry-run 2>/dev/null || echo "  注意: 请手动检查语法"; \
+		$(PSQL) -c "\\set ON_ERROR_STOP on" -f $$file 2>/dev/null || echo "  注意: 请手动检查语法"; \
 	done
 	@echo "SQL 语法检查完成"
 
@@ -146,7 +146,7 @@ analyze: ## 更新表统计信息
 
 vacuum: ## 执行 VACUUM ANALYZE（清理死元组并更新统计）
 	@echo "==> 执行 VACUUM ANALYZE..."
-	@sudo -u postgres psql -d $(POSTGRES_DB) -c "VACUUM ANALYZE;"
+	@$(PSQL) -c "VACUUM ANALYZE;"
 	@echo "✅ VACUUM 完成"
 
 # ============================================================

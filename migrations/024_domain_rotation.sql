@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS active_domain (
     activated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),      -- 激活时间
     activated_by    VARCHAR(50) DEFAULT 'auto',               -- auto/manual
 
-    CONSTRAINT uq_active_domain UNIQUE (domain)
+    CONSTRAINT uq_active_domain UNIQUE (domain),
+    CONSTRAINT uq_active_domain_region UNIQUE (region)
 );
 
 COMMENT ON TABLE active_domain IS '当前活跃域名表：记录各区域当前使用的活跃域名，前端可快速查询';

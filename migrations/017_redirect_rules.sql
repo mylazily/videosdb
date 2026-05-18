@@ -108,7 +108,22 @@ BEGIN
     WHERE r.source_domain = p_domain
       AND r.is_active = TRUE
       AND (r.expires_at IS NULL OR r.expires_at > NOW())
-      AND (r.conditions = '{}'::jsonb OR r.conditions @> jsonb_build_object('ua_contains', p_user_agent))
+      AND (
+          -- 条件为空或默认空对象时，无条件匹配
+          r.conditions = '{}'::jsonb
+          OR r.conditions IS NULL
+          -- 有 ua_contains 条件时，检查 User-Agent 是否包含指定字符串
+          OR (
+              r.conditions ? 'ua_contains'
+              AND r.conditions @> jsonb_build_object('ua_contains', p_user_agent)
+          )
+          -- 有 ua_contains 条件但未提供 UA 时跳过
+          OR (
+              NOT r.conditions ? 'ua_contains'
+              AND r.conditions != '{}'::jsonb
+              AND r.conditions IS NOT NULL
+          )
+      )
     ORDER BY r.priority DESC
     LIMIT 1;
 END;

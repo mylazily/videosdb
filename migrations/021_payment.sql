@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS payment_orders (
     order_no        VARCHAR(64) NOT NULL,                  -- 订单号
     fingerprint_id  UUID REFERENCES device_fingerprints(id) ON DELETE SET NULL,
     tg_user_id      BIGINT,                                -- TG 用户 ID（可选）
-    channel_id      UUID NOT NULL REFERENCES payment_channels(id),
+    channel_id      UUID NOT NULL REFERENCES payment_channels(id) ON DELETE SET NULL,
     product_type    VARCHAR(30) NOT NULL,                  -- video/episode/vip_month/vip_year
     product_id      UUID,                                  -- 关联的视频/剧集 ID
     product_name    VARCHAR(255) NOT NULL,                 -- 商品名称

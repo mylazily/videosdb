@@ -54,7 +54,9 @@ $PSQL_CMD -c "
 CREATE TABLE IF NOT EXISTS schema_migrations (
     id              SERIAL PRIMARY KEY,
     filename        VARCHAR(255) NOT NULL UNIQUE,
-    applied_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    applied_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    checksum        VARCHAR(64),
+    execution_time  INTEGER
 );
 " > /dev/null 2>&1
 
