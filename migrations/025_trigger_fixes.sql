@@ -5,6 +5,7 @@
 -- 说明：
 --   - 为缺失 updated_at 触发器的表添加触发器
 --   - 为没有 updated_at 列的表添加该列
+--   - 所有触发器复用 001 中已定义的 update_updated_at_column() 函数
 -- ============================================================
 
 BEGIN;
@@ -26,43 +27,25 @@ END $$;
 
 COMMENT ON COLUMN danmakus.updated_at IS '更新时间';
 
--- 创建触发器函数（如果不存在）
-CREATE OR REPLACE FUNCTION update_danmakus_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- 删除旧触发器（如果存在）
 DROP TRIGGER IF EXISTS trg_danmakus_updated_at ON danmakus;
 
--- 创建 updated_at 触发器
+-- 创建 updated_at 触发器（复用通用函数）
 CREATE TRIGGER trg_danmakus_updated_at
     BEFORE UPDATE ON danmakus
-    FOR EACH ROW EXECUTE FUNCTION update_danmakus_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- -----------------------------------------------------------
 -- 2. user_watch_histories 表：添加 updated_at 触发器
 -- -----------------------------------------------------------
 
--- 创建触发器函数（如果不存在）
-CREATE OR REPLACE FUNCTION update_watch_history_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- 删除旧触发器（如果存在）
 DROP TRIGGER IF EXISTS trg_watch_histories_updated_at ON user_watch_histories;
 
--- 创建 updated_at 触发器
+-- 创建 updated_at 触发器（复用通用函数）
 CREATE TRIGGER trg_watch_histories_updated_at
     BEFORE UPDATE ON user_watch_histories
-    FOR EACH ROW EXECUTE FUNCTION update_watch_history_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- -----------------------------------------------------------
 -- 3. video_tags 表：添加 updated_at 列和触发器
@@ -81,22 +64,13 @@ END $$;
 
 COMMENT ON COLUMN video_tags.updated_at IS '更新时间';
 
--- 创建触发器函数（如果不存在）
-CREATE OR REPLACE FUNCTION update_video_tags_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- 删除旧触发器（如果存在）
 DROP TRIGGER IF EXISTS trg_video_tags_updated_at ON video_tags;
 
--- 创建 updated_at 触发器
+-- 创建 updated_at 触发器（复用通用函数）
 CREATE TRIGGER trg_video_tags_updated_at
     BEFORE UPDATE ON video_tags
-    FOR EACH ROW EXECUTE FUNCTION update_video_tags_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- -----------------------------------------------------------
 -- 4. user_favorites 表：添加 updated_at 触发器
@@ -115,22 +89,13 @@ END $$;
 
 COMMENT ON COLUMN user_favorites.updated_at IS '更新时间';
 
--- 创建触发器函数（如果不存在）
-CREATE OR REPLACE FUNCTION update_user_favorites_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- 删除旧触发器（如果存在）
 DROP TRIGGER IF EXISTS trg_user_favorites_updated_at ON user_favorites;
 
--- 创建 updated_at 触发器
+-- 创建 updated_at 触发器（复用通用函数）
 CREATE TRIGGER trg_user_favorites_updated_at
     BEFORE UPDATE ON user_favorites
-    FOR EACH ROW EXECUTE FUNCTION update_user_favorites_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- -----------------------------------------------------------
 -- 5. collect_logs 表：添加 updated_at 列和触发器
@@ -149,22 +114,13 @@ END $$;
 
 COMMENT ON COLUMN collect_logs.updated_at IS '更新时间';
 
--- 创建触发器函数（如果不存在）
-CREATE OR REPLACE FUNCTION update_collect_logs_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- 删除旧触发器（如果存在）
 DROP TRIGGER IF EXISTS trg_collect_logs_updated_at ON collect_logs;
 
--- 创建 updated_at 触发器
+-- 创建 updated_at 触发器（复用通用函数）
 CREATE TRIGGER trg_collect_logs_updated_at
     BEFORE UPDATE ON collect_logs
-    FOR EACH ROW EXECUTE FUNCTION update_collect_logs_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- -----------------------------------------------------------
 -- 6. comment_likes 表：添加 updated_at 列和触发器
@@ -183,22 +139,23 @@ END $$;
 
 COMMENT ON COLUMN comment_likes.updated_at IS '更新时间';
 
--- 创建触发器函数（如果不存在）
-CREATE OR REPLACE FUNCTION update_comment_likes_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- 删除旧触发器（如果存在）
 DROP TRIGGER IF EXISTS trg_comment_likes_updated_at ON comment_likes;
 
--- 创建 updated_at 触发器
+-- 创建 updated_at 触发器（复用通用函数）
 CREATE TRIGGER trg_comment_likes_updated_at
     BEFORE UPDATE ON comment_likes
-    FOR EACH ROW EXECUTE FUNCTION update_comment_likes_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- -----------------------------------------------------------
+-- 清理冗余触发器函数（已由 update_updated_at_column 替代）
+-- -----------------------------------------------------------
+DROP FUNCTION IF EXISTS update_danmakus_updated_at();
+DROP FUNCTION IF EXISTS update_watch_history_updated_at();
+DROP FUNCTION IF EXISTS update_video_tags_updated_at();
+DROP FUNCTION IF EXISTS update_user_favorites_updated_at();
+DROP FUNCTION IF EXISTS update_collect_logs_updated_at();
+DROP FUNCTION IF EXISTS update_comment_likes_updated_at();
 
 -- -----------------------------------------------------------
 -- 记录迁移

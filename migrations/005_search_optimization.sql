@@ -101,10 +101,8 @@ COMMENT ON INDEX idx_video_sources_play_links IS '播放线路 JSONB GIN 索引'
 -- -----------------------------------------------------------
 
 -- 视频列表查询：按分类 + 状态 + 更新时间
--- 注意：此索引被 007_performance_optimization.sql 中的 idx_videos_cover_basic 覆盖索引包含
--- 已在 026_cleanup_redundant_indexes.sql 中删除
--- CREATE INDEX IF NOT EXISTS idx_videos_category_status_updated
---     ON videos (category, status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_videos_category_status_updated
+    ON videos (category, status, updated_at DESC);
 
 -- 视频列表查询：按分类 + 评分
 CREATE INDEX IF NOT EXISTS idx_videos_category_score
@@ -185,7 +183,7 @@ CREATE INDEX IF NOT EXISTS idx_videos_recent_hot
     ON videos (daily_view_count DESC)
     WHERE status = 'published'
       AND deleted_at IS NULL
-      AND published_at > NOW() - INTERVAL '30 days';
+      AND published_at IS NOT NULL;
 
 -- -----------------------------------------------------------
 -- 统计视图
@@ -355,7 +353,6 @@ BEGIN
         similarity(v.title, query_text) AS similarity
     FROM videos v
     WHERE v.title % query_text
-      AND similarity(v.title, query_text) >= similarity_threshold
       AND v.status = 'published'
       AND v.deleted_at IS NULL
     ORDER BY similarity DESC
@@ -385,30 +382,27 @@ $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION update_video_score IS '更新视频统计计数（评论数、收藏数）';
 
 -- 新增：批量更新视频评分函数
--- 使用 FULL OUTER JOIN 确保所有视频都被更新（包括没有评论/收藏的视频）
 CREATE OR REPLACE FUNCTION batch_update_video_scores()
 RETURNS INTEGER AS $$
 DECLARE
     updated_count INTEGER;
 BEGIN
-    WITH comment_counts AS (
-        SELECT video_id, COUNT(*) AS count
-        FROM comments
-        WHERE deleted_at IS NULL AND status = 'approved'
-        GROUP BY video_id
-    ),
-    favorite_counts AS (
-        SELECT video_id, COUNT(*) AS count
-        FROM user_favorites
-        GROUP BY video_id
-    ),
-    updated AS (
+    WITH updated AS (
         UPDATE videos v SET
-            comment_count = COALESCE(cc.count, 0),
-            favorite_count = COALESCE(fc.count, 0)
-        FROM comment_counts cc
-        FULL OUTER JOIN favorite_counts fc ON cc.video_id = fc.video_id
-        WHERE v.id = COALESCE(cc.video_id, fc.video_id)
+            comment_count = COALESCE(c.count, 0),
+            favorite_count = COALESCE(f.count, 0)
+        FROM (
+            SELECT video_id, COUNT(*) AS count
+            FROM comments
+            WHERE deleted_at IS NULL AND status = 'approved'
+            GROUP BY video_id
+        ) c
+        LEFT JOIN (
+            SELECT video_id, COUNT(*) AS count
+            FROM user_favorites
+            GROUP BY video_id
+        ) f ON f.video_id = v.id
+        WHERE v.id = COALESCE(c.video_id, f.video_id)
         RETURNING v.id
     )
     SELECT COUNT(*) INTO updated_count FROM updated;
@@ -521,7 +515,6 @@ $$ LANGUAGE plpgsql STABLE;
 COMMENT ON FUNCTION get_comment_tree IS '获取视频的评论树（顶级评论及其回复）';
 
 -- 新增：清理软删除数据函数
--- 安全限制：仅允许清理白名单中的表，防止 SQL 注入风险
 CREATE OR REPLACE FUNCTION cleanup_soft_deleted(
     p_table_name TEXT,
     p_days INTEGER DEFAULT 30
@@ -530,24 +523,7 @@ RETURNS INTEGER AS $$
 DECLARE
     deleted_count INTEGER;
     sql_query TEXT;
-    allowed_tables TEXT[] := ARRAY[
-        'videos', 'users', 'comments', 'danmakus', 'episodes',
-        'video_sources', 'episode_sources', 'collect_logs',
-        'user_watch_histories', 'share_links', 'redirect_rules',
-        'payment_orders', 'vip_subscriptions', 'coin_transactions',
-        'ad_tasks', 'daily_task_completions', 'danmaku_import_tasks'
-    ];
 BEGIN
-    -- 白名单校验：防止任意表被删除
-    IF NOT EXISTS (SELECT 1 FROM unnest(allowed_tables) AS t WHERE t = p_table_name) THEN
-        RAISE EXCEPTION '表 "%" 不在清理白名单中，拒绝执行', p_table_name;
-    END IF;
-
-    -- 参数校验
-    IF p_days < 1 THEN
-        RAISE EXCEPTION '清理天数必须大于 0';
-    END IF;
-
     sql_query := format(
         'DELETE FROM %I WHERE deleted_at < NOW() - INTERVAL ''%s days''',
         p_table_name,

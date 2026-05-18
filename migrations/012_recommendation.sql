@@ -124,7 +124,7 @@ BEGIN
     -- 如果没有偏好数据，返回热门视频
     IF v_preferred_tags = '[]'::JSONB OR v_preferred_tags IS NULL THEN
         RETURN QUERY
-        SELECT v.id, (v.view_count / (SELECT MAX(view_count) FROM videos WHERE status = 'published' AND deleted_at IS NULL))::REAL AS score
+        SELECT v.id, (v.view_count / NULLIF((SELECT MAX(view_count) FROM videos WHERE status = 'published' AND deleted_at IS NULL), 0))::REAL AS score
         FROM videos v
         WHERE v.status = 'published'
           AND v.deleted_at IS NULL
@@ -229,7 +229,7 @@ CREATE INDEX IF NOT EXISTS idx_user_preferences_tags
 -- video_recommendations 表索引
 CREATE INDEX IF NOT EXISTS idx_video_recommendations_expires
     ON video_recommendations(expires_at)
-    WHERE expires_at < NOW();
+    WHERE expires_at IS NOT NULL;
 
 -- -----------------------------------------------------------
 -- 记录迁移
